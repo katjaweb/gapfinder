@@ -9,4 +9,5 @@ dependencies = [
     "minsearch>=0.0.5",
     "openai>=1.50.0",
     "python-dotenv>=1.0.0",
+    "youtube-transcript-api>=0.6.0"
 ]
