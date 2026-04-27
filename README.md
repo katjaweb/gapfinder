@@ -1,14 +1,45 @@
-# Your Project Name
+# GapFinder
 
 A starter template for the AI Engineering Buildcamp capstone. Replace this README with a description of your own project.
 
 ## The Problem
 
-Describe the problem your project solves and who has it. One or two sentences.
+People who learn from long-form videos (e.g., students, self-learners, engineers watching tutorials) often feel like they understand the material but can’t identify what they’ve actually missed. This leads to inefficient rewatching and shallow learning because there’s no clear feedback on gaps in understanding.
 
 ## What It Does
 
-Describe what the AI system does and a typical interaction. What does the user provide? What does the system return?
+The user provides a YouTube video link and answers a small set of generated questions about the content. The system analyzes their responses against the video’s key concepts and returns a structured report highlighting what they understood well, what they misunderstood or missed, and which specific parts of the video they should revisit.
+
+## What the system actually does
+
+Input:
+YouTube video URL 
+User answers to questions 
+
+System flow:
+Step 1 — Extract & structure knowledge
+Transcribe video 
+Break into concepts (chunking + labeling) 
+
+Step 2 — Generate diagnostic questions
+Not generic questions — but:
+Concept coverage questions 
+“Explain in your own words” prompts 
+Application questions (transfer knowledge) 
+
+Step 3 — User answers
+User types responses (key part — don’t skip this)
+
+Step 4 — Gap detection (core innovation)
+This is the heart of your project:
+The system compares:
+Expected concepts (from transcript) 
+User answers 
+And identifies:
+Missing concepts 
+Misunderstandings 
+Shallow explanations
+
 
 ## Setup
 
