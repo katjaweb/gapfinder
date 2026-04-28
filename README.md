@@ -1,7 +1,5 @@
 # GapFinder
 
-A starter template for the AI Engineering Buildcamp capstone. Replace this README with a description of your own project.
-
 ## The Problem
 
 People who learn from long-form videos (e.g., students, self-learners, engineers watching tutorials) often feel like they understand the material but can’t identify what they’ve actually missed. This leads to inefficient rewatching and shallow learning because there’s no clear feedback on gaps in understanding.
@@ -16,7 +14,8 @@ Input:
 YouTube video URL 
 User answers to questions 
 
-System flow:
+## System flow
+
 Step 1 — Extract & structure knowledge
 Transcribe video 
 Break into concepts (chunking + labeling) 
@@ -28,10 +27,9 @@ Concept coverage questions
 Application questions (transfer knowledge) 
 
 Step 3 — User answers
-User types responses (key part — don’t skip this)
+User types responses
 
 Step 4 — Gap detection (core innovation)
-This is the heart of your project:
 The system compares:
 Expected concepts (from transcript) 
 User answers 
@@ -39,6 +37,22 @@ And identifies:
 Missing concepts 
 Misunderstandings 
 Shallow explanations
+
+## Agent structure:
+
+Planner Agent
+Decides:
+Which concepts to test
+Which question types to generate
+
+Question Generator Tool
+Creates diagnostic questions
+
+Evaluation Tool (LLM-as-judge)
+Grades answers against concept checklist
+
+Gap Analyzer Tool
+Maps errors → missing concepts
 
 
 ## Setup
