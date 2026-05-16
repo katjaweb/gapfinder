@@ -1,6 +1,7 @@
 import asyncio
-import streamlit as st
 import dotenv
+import logfire
+import streamlit as st
 
 from openai import OpenAI
 from youtube_transcript_api import YouTubeTranscriptApi
@@ -24,6 +25,32 @@ dotenv.load_dotenv()
 
 
 # ---------------------------------------------------
+# LOGFIRE
+# ---------------------------------------------------
+
+logfire.configure(
+    service_name="gapfinder-agent",
+    send_to_logfire=True,
+)
+
+logfire.instrument_pydantic_ai()
+
+# Session-Span
+if "logfire_context" not in st.session_state:
+
+    session_span = logfire.span(
+        "streamlit_session"
+    )
+
+    session_span.__enter__()
+
+    st.session_state.logfire_span = session_span
+    st.session_state.logfire_context = logfire.get_context()
+
+    logfire.info("streamlit_session_started")
+
+
+# ---------------------------------------------------
 # PAGE CONFIG
 # ---------------------------------------------------
 
@@ -43,26 +70,30 @@ st.title("🎥 GapFinder YouTube Agent")
 @st.cache_resource
 def setup_agent():
 
-    client = OpenAI()
+    with logfire.span("setup_agent"):
 
-    ytt_api = YouTubeTranscriptApi()
+        client = OpenAI()
 
-    config = GapFinderAgentConfig()
+        ytt_api = YouTubeTranscriptApi()
 
-    agent_tools = GapFinderAgentTools(
-        client=client,
-        model="gpt-4o-mini",
-        ytt_api=ytt_api,
-        chunk_func=chunk_documents,
-        index_cls=Index,
-    )
+        config = GapFinderAgentConfig()
 
-    agent = create_agent(
-        config=config,
-        agent_tools=agent_tools,
-    )
+        agent_tools = GapFinderAgentTools(
+            client=client,
+            model="gpt-4o-mini",
+            ytt_api=ytt_api,
+            chunk_func=chunk_documents,
+            index_cls=Index,
+        )
 
-    return agent
+        agent = create_agent(
+            config=config,
+            agent_tools=agent_tools,
+        )
+
+        logfire.info("agent_initialized")
+
+        return agent
 
 
 agent = setup_agent()
@@ -85,7 +116,7 @@ if "chat_messages" not in st.session_state:
 
 video_url = st.text_input(
     "YouTube URL",
-    value="https://www.youtube.com/watch?v=wjZofJX0v4M"
+    value="https://www.youtube.com/watch?v=wjZofJX0v4M",
 )
 
 
@@ -105,15 +136,34 @@ for msg in st.session_state.chat_messages:
 
 async def ask_agent(user_prompt: str):
 
-    result = await run_agent(
-        agent,
-        user_prompt,
-        st.session_state.message_history,
-    )
+    with logfire.attach_context(
+        st.session_state.logfire_context
+    ):
 
-    st.session_state.message_history = result.all_messages()
+        with logfire.span(
+            "agent_request",
+            prompt=user_prompt,
+        ):
 
-    return result.output
+            logfire.info(
+                "user_prompt",
+                prompt=user_prompt,
+            )
+
+            result = await run_agent(
+                agent,
+                user_prompt,
+                st.session_state.message_history,
+            )
+
+            st.session_state.message_history = result.all_messages()
+
+            logfire.info(
+                "assistant_response",
+                response=result.output,
+            )
+
+            return result.output
 
 
 # ---------------------------------------------------
@@ -128,7 +178,7 @@ if st.button("Analyze Video"):
 
     st.session_state.chat_messages.append({
         "role": "user",
-        "content": initial_prompt
+        "content": initial_prompt,
     })
 
     with st.chat_message("user"):
@@ -138,15 +188,24 @@ if st.button("Analyze Video"):
 
         with st.spinner("Analyzing video..."):
 
-            response = asyncio.run(
-                ask_agent(initial_prompt)
-            )
+            with logfire.attach_context(
+                st.session_state.logfire_context
+            ):
 
-            st.markdown(response)
+                with logfire.span(
+                    "initial_video_analysis",
+                    video_url=video_url,
+                ):
+
+                    response = asyncio.run(
+                        ask_agent(initial_prompt)
+                    )
+
+                    st.markdown(response)
 
     st.session_state.chat_messages.append({
         "role": "assistant",
-        "content": response
+        "content": response,
     })
 
 
@@ -162,7 +221,7 @@ if user_input:
 
     st.session_state.chat_messages.append({
         "role": "user",
-        "content": user_input
+        "content": user_input,
     })
 
     with st.chat_message("user"):
@@ -172,13 +231,59 @@ if user_input:
 
         with st.spinner("Thinking..."):
 
-            response = asyncio.run(
-                ask_agent(user_input)
-            )
+            with logfire.attach_context(
+                st.session_state.logfire_context
+            ):
 
-            st.markdown(response)
+                with logfire.span(
+                    "chat_interaction",
+                ):
+
+                    response = asyncio.run(
+                        ask_agent(user_input)
+                    )
+
+                    st.markdown(response)
 
     st.session_state.chat_messages.append({
         "role": "assistant",
-        "content": response
+        "content": response,
     })
+
+
+# ---------------------------------------------------
+# FEEDBACK
+# ---------------------------------------------------
+
+if st.session_state.chat_messages:
+
+    st.divider()
+
+    feedback = st.feedback(
+        "thumbs",
+        key="conversation_feedback",
+    )
+
+    if feedback is not None:
+
+        score = "thumbs_up" if feedback == 1 else "thumbs_down"
+
+        with logfire.attach_context(
+            st.session_state.logfire_context
+        ):
+
+            with logfire.span(
+                "conversation_feedback",
+                feedback=score,
+            ):
+
+                logfire.info(
+                    "user_feedback",
+                    feedback=score,
+                    total_messages=len(
+                        st.session_state.chat_messages
+                    ),
+                    video_url=video_url,
+                )
+
+        st.success("Feedback received — thank you!")
