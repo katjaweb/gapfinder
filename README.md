@@ -61,13 +61,17 @@ Maps errors → missing concepts
 
 2. Clone this repository (or download the zip and extract it).
 
-3. Create a `.env` file from the template and add your API key:
+3. Create a `.env` file and add your API keys:
 
        cp .env.example .env
 
 4. Install dependencies:
 
        uv sync
+
+5. Authenticate to logfire
+
+       uv run logfire auth
 
 5. Start Jupyter:
 
