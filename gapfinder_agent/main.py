@@ -1,7 +1,9 @@
 from pydantic_ai import Agent, RunUsage
 
+from gapfinder_agent.yt_rag_pipeline import VideoMetadataService
 from gapfinder_agent.yt_agent import create_agent, run_agent, GapFinderAgentConfig
 from gapfinder_agent.tools import GapFinderAgentTools
+from gapfinder_agent.yt_rag_pipeline import YouTubePipeline, VideoMetadataService, TranscriptService, StorageService, ChunkService
 
 from minsearch import Index
 from gitsource import chunk_documents
@@ -12,15 +14,37 @@ dotenv.load_dotenv()
 
 client = OpenAI()
 ytt_api = YouTubeTranscriptApi()
-config = GapFinderAgentConfig()
+
+metadata = VideoMetadataService()
+transcripts = TranscriptService(YouTubeTranscriptApi())
+storage = StorageService()
+chunking = ChunkService(storage)
+
+pipeline = YouTubePipeline(
+    metadata,
+    transcripts,
+    storage,
+    chunking,
+    chunk_documents_fn=chunk_documents
+)
+
+url = "https://www.youtube.com/watch?v=wjZofJX0v4M"
+result = pipeline.process_video(url)
+print(result)
+index = pipeline.create_rag_index()
+print("RAG index created with", len(index.docs), "chunks")
+
+config = GapFinderAgentConfig(
+    client=client,
+    model='gpt-4o-mini'
+)
 
 agent_tools = GapFinderAgentTools(
-    client=client,
-    model="gpt-4o-mini",
-    ytt_api=ytt_api,
-    chunk_func=chunk_documents,
-    index_cls=Index
+    client=OpenAI(),
+    model='openai:gpt-4o-mini',
+    index_cls=index
 )
+
 
 async def run_qna(agent: Agent):
     messages = []
@@ -31,7 +55,7 @@ async def run_qna(agent: Agent):
         if user_prompt.lower().strip() == 'stop':
             break
 
-        user_prompt = "What is this video about: https://www.youtube.com/watch?v=wjZofJX0v4M?"
+        # user_prompt = "What is this video about: https://www.youtube.com/watch?v=wjZofJX0v4M?"
         result = await run_agent(agent, user_prompt, messages)
 
         usage = usage + result.usage()
@@ -45,24 +69,6 @@ async def chat(config=config, agent_tools=agent_tools):
     print("Type 'stop' to exit.\n")
 
     message_history = []
-
-
-    initial_prompt = (
-        "I want to learn more about this video: "
-        "https://www.youtube.com/watch?v=wjZofJX0v4M"
-    )
-
-    print(f"You: {initial_prompt}")
-
-    result = await run_agent(
-        agent,
-        initial_prompt,
-        message_history
-    )
-
-    print(f"**ASSISTANT:**\n{result.output}")
-
-    message_history = result.all_messages()
 
     while True:
 
