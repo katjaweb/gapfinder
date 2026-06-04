@@ -5,7 +5,6 @@ import streamlit as st
 
 from openai import OpenAI
 from youtube_transcript_api import YouTubeTranscriptApi
-from minsearch import Index
 from gitsource import chunk_documents
 
 from gapfinder_agent.yt_agent import (
@@ -15,6 +14,7 @@ from gapfinder_agent.yt_agent import (
 )
 
 from gapfinder_agent.tools import GapFinderAgentTools
+from gapfinder_agent.yt_rag_pipeline import YouTubePipeline, VideoMetadataService, TranscriptService, StorageService, ChunkService
 
 
 # ---------------------------------------------------
@@ -62,28 +62,52 @@ st.set_page_config(
 
 st.title("🎥 GapFinder YouTube Agent")
 
+# ---------------------------------------------------
+# VIDEO PROCESSING
+# ---------------------------------------------------
+
+metadata = VideoMetadataService()
+transcripts = TranscriptService(YouTubeTranscriptApi())
+storage = StorageService()
+chunking = ChunkService(storage)
+
+pipeline = YouTubePipeline(
+    metadata,
+    transcripts,
+    storage,
+    chunking,
+    chunk_documents_fn=chunk_documents
+)
+
+if "video_url" not in st.session_state:
+    st.session_state.video_url = "https://www.youtube.com/watch?v=wjZofJX0v4M"
+
+if "rag_index" not in st.session_state:
+    st.session_state.rag_index = None
+
+if "agent" not in st.session_state:
+    st.session_state.agent = None
+
 
 # ---------------------------------------------------
 # AGENT SETUP
 # ---------------------------------------------------
 
-@st.cache_resource
-def setup_agent():
+def setup_agent(index):
 
     with logfire.span("setup_agent"):
 
         client = OpenAI()
 
-        ytt_api = YouTubeTranscriptApi()
-
-        config = GapFinderAgentConfig()
+        config = GapFinderAgentConfig(
+            client=client,
+            model='gpt-4o-mini'
+        )
 
         agent_tools = GapFinderAgentTools(
-            client=client,
-            model="gpt-4o-mini",
-            ytt_api=ytt_api,
-            chunk_func=chunk_documents,
-            index_cls=Index,
+            client=OpenAI(),
+            model='openai:gpt-4o-mini',
+            index_cls=index
         )
 
         agent = create_agent(
@@ -96,7 +120,7 @@ def setup_agent():
         return agent
 
 
-agent = setup_agent()
+agent = None
 
 
 # ---------------------------------------------------
@@ -108,26 +132,6 @@ if "message_history" not in st.session_state:
 
 if "chat_messages" not in st.session_state:
     st.session_state.chat_messages = []
-
-
-# ---------------------------------------------------
-# VIDEO INPUT
-# ---------------------------------------------------
-
-video_url = st.text_input(
-    "YouTube URL",
-    value="https://www.youtube.com/watch?v=wjZofJX0v4M",
-)
-
-
-# ---------------------------------------------------
-# DISPLAY CHAT
-# ---------------------------------------------------
-
-for msg in st.session_state.chat_messages:
-
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
 
 
 # ---------------------------------------------------
@@ -151,7 +155,7 @@ async def ask_agent(user_prompt: str):
             )
 
             result = await run_agent(
-                agent,
+                st.session_state.agent,
                 user_prompt,
                 st.session_state.message_history,
             )
@@ -165,48 +169,70 @@ async def ask_agent(user_prompt: str):
 
             return result.output
 
-
 # ---------------------------------------------------
-# INITIAL ANALYSIS BUTTON
+# VIDEO INPUT
 # ---------------------------------------------------
 
-if st.button("Analyze Video"):
-
-    initial_prompt = (
-        f"I want to learn more about this video: {video_url}"
+with st.sidebar:
+    st.header("Video URL")
+    video_url = st.text_input(
+        "YouTube URL",
+        value=st.session_state.video_url,
     )
+    analyze_button = st.button("Analyze Video")
 
-    st.session_state.chat_messages.append({
-        "role": "user",
-        "content": initial_prompt,
-    })
+    if analyze_button:
+        st.session_state.video_url = video_url
 
-    with st.chat_message("user"):
-        st.markdown(initial_prompt)
+        with st.spinner("Processing video..."):
+            pipeline.process_video(video_url)
+            index = pipeline.create_rag_index()
+            st.session_state.rag_index = index
+            st.session_state.agent = setup_agent(index)
 
-    with st.chat_message("assistant"):
+        st.success("Video processed successfully.")
 
-        with st.spinner("Analyzing video..."):
+        initial_prompt = (
+            f"I want to learn more about this video: {video_url}"
+        )
 
-            with logfire.attach_context(
-                st.session_state.logfire_context
-            ):
+        st.session_state.chat_messages.append({
+            "role": "user",
+            "content": initial_prompt,
+        })
 
-                with logfire.span(
-                    "initial_video_analysis",
-                    video_url=video_url,
+        with st.chat_message("user"):
+            st.markdown(initial_prompt)
+
+        with st.chat_message("assistant"):
+            with st.spinner("Analyzing video..."):
+                with logfire.attach_context(
+                    st.session_state.logfire_context
                 ):
+                    with logfire.span(
+                        "initial_video_analysis",
+                        video_url=video_url,
+                    ):
+                        response = asyncio.run(
+                            ask_agent(initial_prompt)
+                        )
+                        st.markdown(response)
 
-                    response = asyncio.run(
-                        ask_agent(initial_prompt)
-                    )
+        st.session_state.chat_messages.append({
+            "role": "assistant",
+            "content": response,
+        })
 
-                    st.markdown(response)
 
-    st.session_state.chat_messages.append({
-        "role": "assistant",
-        "content": response,
-    })
+# ---------------------------------------------------
+# DISPLAY CHAT
+# ---------------------------------------------------
+
+for msg in st.session_state.chat_messages:
+
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
 
 
 # ---------------------------------------------------
