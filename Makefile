@@ -4,7 +4,7 @@ app:
 	uv run python -m streamlit run gapfinder_agent/app.py
 
 run:
-	uv run python main.py
+	uv run python -m gapfinder_agent.main
 
 streamlit:
 	uv run python -m streamlit run gapfinder_agent/app.py
