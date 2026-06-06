@@ -6,9 +6,6 @@ app:
 run:
 	uv run python -m gapfinder_agent.main
 
-streamlit:
-	uv run python -m streamlit run gapfinder_agent/app.py
-
 tests:
 	uv run pytest tests/test_agent.py -s
 
