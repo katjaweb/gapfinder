@@ -1,4 +1,5 @@
 import asyncio
+import concurrent.futures
 import dotenv
 import logfire
 import streamlit as st
@@ -106,7 +107,7 @@ def setup_agent(index):
 
         agent_tools = GapFinderAgentTools(
             client=OpenAI(),
-            model='openai:gpt-4o-mini',
+            model='gpt-4o-mini',
             index_cls=index
         )
 
@@ -169,12 +170,38 @@ async def ask_agent(user_prompt: str):
 
             return result.output
 
+
+def run_coroutine_sync(coro):
+    try:
+        return asyncio.run(coro)
+    except RuntimeError:
+        def run_in_thread():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                return loop.run_until_complete(coro)
+            finally:
+                loop.close()
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(run_in_thread)
+            return future.result()
+
 # ---------------------------------------------------
 # VIDEO INPUT
 # ---------------------------------------------------
 
 with st.sidebar:
     st.header("Video URL")
+    st.markdown(
+        """
+        **How to use**
+
+        1. Enter a YouTube URL and click **Analyze Video**.
+        2. Wait while the video is processed.
+        3. Start chatting with the assistant.
+        """
+    )
     video_url = st.text_input(
         "YouTube URL",
         value=st.session_state.video_url,
@@ -201,38 +228,22 @@ with st.sidebar:
             "content": initial_prompt,
         })
 
-        with st.chat_message("user"):
-            st.markdown(initial_prompt)
-
-        with st.chat_message("assistant"):
-            with st.spinner("Analyzing video..."):
-                with logfire.attach_context(
-                    st.session_state.logfire_context
+        with st.spinner("Analyzing video..."):
+            with logfire.attach_context(
+                st.session_state.logfire_context
+            ):
+                with logfire.span(
+                    "initial_video_analysis",
+                    video_url=video_url,
                 ):
-                    with logfire.span(
-                        "initial_video_analysis",
-                        video_url=video_url,
-                    ):
-                        response = asyncio.run(
-                            ask_agent(initial_prompt)
-                        )
-                        st.markdown(response)
+                    response = run_coroutine_sync(
+                        ask_agent(initial_prompt)
+                    )
 
         st.session_state.chat_messages.append({
             "role": "assistant",
             "content": response,
         })
-
-
-# ---------------------------------------------------
-# DISPLAY CHAT
-# ---------------------------------------------------
-
-for msg in st.session_state.chat_messages:
-
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
-
 
 
 # ---------------------------------------------------
@@ -250,31 +261,29 @@ if user_input:
         "content": user_input,
     })
 
-    with st.chat_message("user"):
-        st.markdown(user_input)
+    with st.spinner("Thinking..."):
 
-    with st.chat_message("assistant"):
+        with logfire.attach_context(
+            st.session_state.logfire_context
+        ):
 
-        with st.spinner("Thinking..."):
-
-            with logfire.attach_context(
-                st.session_state.logfire_context
+            with logfire.span(
+                "chat_interaction",
             ):
 
-                with logfire.span(
-                    "chat_interaction",
-                ):
-
-                    response = asyncio.run(
-                        ask_agent(user_input)
-                    )
-
-                    st.markdown(response)
+                response = run_coroutine_sync(
+                    ask_agent(user_input)
+                )
 
     st.session_state.chat_messages.append({
         "role": "assistant",
         "content": response,
     })
+
+for msg in st.session_state.chat_messages:
+
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
 
 # ---------------------------------------------------
