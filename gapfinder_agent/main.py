@@ -41,7 +41,7 @@ config = GapFinderAgentConfig(
 
 agent_tools = GapFinderAgentTools(
     client=OpenAI(),
-    model='openai:gpt-4o-mini',
+    model='gpt-4o-mini',
     index_cls=index
 )
 
