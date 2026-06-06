@@ -40,7 +40,7 @@ class JudgeFeedback(BaseModel):
 def create_judge_agent():
     agent = Agent(
         name="judge",
-        model="openai:gpt-4o-mini",
+        model="gpt-4o-mini",
         instructions=judge_instructions,
         output_type=JudgeFeedback
     )
