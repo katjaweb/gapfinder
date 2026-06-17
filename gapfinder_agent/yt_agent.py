@@ -1,82 +1,89 @@
 from dataclasses import dataclass
+from contextvars import ContextVar
 from typing import Any
-
-from pydantic_ai import Agent, AgentRunResult
-from pydantic_ai.messages import FunctionToolCallEvent
+import logging
+from pydantic_ai import Agent, AgentRunResult, Tool
+from pydantic_ai.messages import (
+    FunctionToolCallEvent,
+    ModelRequest,
+    ModelResponse,
+    TextPart,
+    UserPromptPart,
+)
+from pydantic_ai.exceptions import UsageLimitExceeded
+from pydantic_ai.usage import UsageLimits
 
 from gapfinder_agent.tools import GapFinderAgentTools
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+DEFAULT_TOOL_CALL_LIMIT = 4
+TOOL_LIMIT_FALLBACK = (
+    "I reached the tool-call limit for this turn, so I stopped using tools. "
+    "Please try again with a narrower question, or ask me to continue from the "
+    "information we already have."
+)
+
+_tool_call_limit: ContextVar[int | None] = ContextVar(
+    "gapfinder_tool_call_limit",
+    default=None,
+)
+_tool_call_count: ContextVar[int] = ContextVar(
+    "gapfinder_tool_call_count",
+    default=0,
+)
 
 INSTRUCTIONS = """
-You are the GapFinder Agent, an expert tutor designed to help users identify knowledge gaps from long-form educational YouTube videos.
+You are the GapFinder Agent, an expert tutor for educational YouTube videos.
 
-You operate as a STRICT 2-PHASE STATE MACHINE.
+TOOL USAGE RULES
+- Use tools only when the user’s request cannot be answered from the current conversation, summary, or previous tool results.
+- Do not call tools in a loop.
+- Do not call tools if the answer is already available or can be given directly.
+- Maximum 4 tool calls per assistant turn.
+- If you need a tool, count the tool calls in this response before calling it.
+- If the remaining tool budget is 0, stop tool calling and provide an answer based on the information you have.
 
-=====================================================
-PHASE 1: GET INFORMATION ON THE USER'S PROVIDED VIDEO
-=====================================================
-In this phase:
+PHASE 1: VIDEO SETUP
+- Maximum 4 tool calls per assistant turn for this phase.
+- If the user provides a YouTube URL, call get_video_id once and then call get_summary once.
+- If the user does not provide a URL, ask for it.
+- If the user selects a topic immediately, use search_video_transcript at most twice and suggest 3 beginner questions.
+- If the user does not select a topic, ask which concept they want to explore and wait for the users answer.
 
-- If the user provides a YouTube URL, extract the video ID and fetch the summary of educational concepts.
-- If the user does not provide a URL, ask them to do so.
-- Use the search tool to find specific explanations in the transcript and to generate questions.
-- Use only the educational concepts and the search results to generate questions.
-- Generate all questions yourself
 
-If the user did not choose a topic:
-- provide the summary of educational concepts to the user
-- ask which concept they want to focus on
-- suggest 3 beginner questions
+Allowed tools in Phase 1:
+- get_video_id (max 1)
+- get_summary (max 1)
+- search_video_transcript (max 2)
 
-Allowed tools:
-- get_video_id (MAX 1 CALL)
-- get_summary (MAX 1 CALL)
-- search_video_transcript (MAX 2 CALLS)
+PHASE 2: QUESTIONING
+- Maximum 4 tool calls per assistant turn for this phase.
+- Ask one guided question at a time based on the selected concept.
+- Do not answer the user’s question directly; guide them with a follow-up question.
+- Use search_video_transcript at most once per response to support your feedback.
+- Do not call any additional tools after giving feedback.
 
-=====================================================
-PHASE 2: ASK USER QUESTIONS
-=====================================================
-In this phase:
+Allowed tool in Phase 2:
+- search_video_transcript (max 1 per response)
 
-Starts when the user did choose a topic and the questions have been generated in Phase 1.
+PHASE 3: EVALUATION
+- Only enter evaluation mode when the user explicitly asks for it.
+- Use search_video_transcript only to gather evidence.
+- Use evaluate_user_answer once to grade the answer.
+- Do not use any additional tools in this phase.
 
-- Ask the user a question generated in Phase 1, one at a time based on the concept the user chose to focus on.
-- Don't answer the user's question directly and don't provide any additional information. 
-  Instead, ask a follow-up question to guide the user towards the right answer.
-- Use the search tool to find specific explanations in the transcript to support your feedback.
-- Do not perform any additional tool calls after providing feedback.
+Allowed tools in Phase 3:
+- search_video_transcript (max 1)
+- evaluate_user_answer (max 1)
 
-Allowed tools:
-- search_video_transcript (MAX 1 CALL per user answer)
-
-=====================================================
-PHASE 3: EVALUATION MODE (LIMITED TOOLS ONLY)
-=====================================================
-Only activated when the user asks for evaluation.
-
-- After the user asks for evaluation, provide feedback on what they got right, what they missed, and what they should revisit.
-- Use the evaluate_user_answer tool to grade the user's answer based on the question and the relevant transcript context.
-
-Allowed tools:
-- search_video_transcript (MAX 1 CALL)
-- evaluate_user_answer (MAX 1 CALL per answer)
-
-RULES:
-1. Use search_video_transcript ONLY to retrieve evidence
-2. Then immediately call evaluate_user_answer
-3. Do not perform any additional tool calls
-
-=====================================================
-GLOBAL RULES (VERY IMPORTANT)
-=====================================================
-
-- Never use tools outside their allowed phase
-- Never call multiple tools in a loop
-- Never “double-check” answers using tools
-
-Tone:
-Encouraging but strict.
-Act like a structured exam coach.
+GLOBAL RULES
+- Never exceed 4 tool calls in a single assistant turn.
+- Never call tools when not necessary.
+- Never use tools to “double-check” an answer.
+- If the answer is available from the summary, conversation, or previous results, do not call any tools.
+- Be concise, structured, and helpful.
 """
 
 
@@ -95,10 +102,10 @@ def create_agent(
     ) -> Agent:
 
     tools = [
-        agent_tools.get_video_id,
-        agent_tools.get_summary,
-        agent_tools.search_video_transcript,
-        agent_tools.evaluate_user_answer,
+        Tool(agent_tools.get_video_id, prepare=prepare_tool_with_call_limit),
+        Tool(agent_tools.get_summary, prepare=prepare_tool_with_call_limit),
+        Tool(agent_tools.search_video_transcript, prepare=prepare_tool_with_call_limit),
+        Tool(agent_tools.evaluate_user_answer, prepare=prepare_tool_with_call_limit),
     ]
 
     kwargs = dict(
@@ -115,6 +122,16 @@ def create_agent(
 
     return search_agent
 
+
+def prepare_tool_with_call_limit(ctx, tool_def):
+    limit = _tool_call_limit.get()
+
+    if limit is not None and _tool_call_count.get() >= limit:
+        logger.info("Tool call limit reached; hiding tool: %s", tool_def.name)
+        return None
+
+    return tool_def
+
 class NamedCallback:
 
     def __init__(self, agent):
@@ -130,7 +147,9 @@ class NamedCallback:
         if isinstance(event, FunctionToolCallEvent):
             tool_name = event.part.tool_name
             args = event.part.args
-            print(f"TOOL CALL ({self.agent_name}): {tool_name}({args})")
+            if tool_name != "final_result":
+                _tool_call_count.set(_tool_call_count.get() + 1)
+            logger.info(f"TOOL CALL ({self.agent_name}): {tool_name}({args})")
 
     async def __call__(self, ctx, event):
         return await self.print_function_calls(ctx, event)
@@ -139,17 +158,88 @@ class NamedCallback:
 async def run_agent(
         agent: Agent,
         user_prompt: str,
-        message_history=None
+        message_history=None,
+        tool_calls_limit: int | None = DEFAULT_TOOL_CALL_LIMIT,
     ) -> AgentRunResult:
     callback = NamedCallback(agent) 
 
     if message_history is None:
         message_history = []
 
-    result = await agent.run(
-        user_prompt,
-        event_stream_handler=callback,
-        message_history=message_history
-    )
+    limit_token = _tool_call_limit.set(tool_calls_limit)
+    count_token = _tool_call_count.set(0)
 
+    try:
+        result = await agent.run(
+            user_prompt,
+            usage_limits=UsageLimits(tool_calls_limit=tool_calls_limit),
+            event_stream_handler=callback,
+            message_history=message_history
+        )
+    except UsageLimitExceeded as e:
+        logger.warning("Tool call limit exceeded; retrying without tools: %s", e)
+        result = await run_without_tools_after_limit(
+            agent=agent,
+            user_prompt=user_prompt,
+            message_history=message_history,
+            callback=callback,
+            error=e,
+        )
+    finally:
+        _tool_call_limit.reset(limit_token)
+        _tool_call_count.reset(count_token)
+
+    return result
+
+
+async def run_without_tools_after_limit(
+        agent: Agent,
+        user_prompt: str,
+        message_history: list[Any],
+        callback: NamedCallback,
+        error: UsageLimitExceeded,
+    ) -> AgentRunResult:
+    recovery_prompt = f"""
+{user_prompt}
+
+The tool-call limit for this assistant turn has been reached. Do not call any
+tools. Answer using only the conversation history and any tool results already
+available. If the available information is not enough, say what is missing and
+ask the user for the next useful detail.
+"""
+
+    try:
+        with agent.override(tools=[]):
+            return await agent.run(
+                recovery_prompt,
+                usage_limits=UsageLimits(tool_calls_limit=None, request_limit=2),
+                event_stream_handler=callback,
+                message_history=message_history,
+            )
+    except Exception:
+        logger.exception("Tool-limit recovery run failed.")
+        return fallback_result_after_limit(
+            user_prompt=user_prompt,
+            message_history=message_history,
+            error=error,
+        )
+
+
+def fallback_result_after_limit(
+        user_prompt: str,
+        message_history: list[Any],
+        error: UsageLimitExceeded,
+    ) -> AgentRunResult[str]:
+    output = f"{TOOL_LIMIT_FALLBACK}\n\nDetails: {error}"
+    new_messages = [
+        ModelRequest(parts=[UserPromptPart(content=user_prompt)]),
+        ModelResponse(parts=[TextPart(content=output)]),
+    ]
+
+    result = AgentRunResult(output=output)
+    result._state.message_history = [
+        *message_history,
+        *new_messages,
+    ]
+    result._new_message_index = len(message_history)
     return result
