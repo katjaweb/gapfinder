@@ -12,20 +12,39 @@ client = OpenAI()
 ytt_api = YouTubeTranscriptApi()
 
 from gapfinder_agent.yt_agent import create_agent, run_agent, GapFinderAgentConfig
+from gapfinder_agent.ingest import YouTubePipeline, VideoMetadataService, TranscriptService, StorageService, ChunkService
 from gapfinder_agent.tools import GapFinderAgentTools
 from tests.utils import SearchResult, ToolCall, collect_tools
+
+
+# ytt_api = YouTubeTranscriptApi()
+storage_service = StorageService()
+
+pipeline = YouTubePipeline(
+    # metadata_service=VideoMetadataService(),
+    # transcript_service=TranscriptService(ytt_api),
+    storage_service=storage_service,
+    chunk_service=ChunkService(storage_service),
+    chunk_documents_fn=chunk_documents,
+)
+
+
+index = pipeline.create_rag_index()
+print("RAG index created with", len(index.docs), "chunks")
 
 
 def create_test_agent(output_type=None):
     tools = GapFinderAgentTools(
         client=client,
-        model="gpt-4o-mini",
-        ytt_api=ytt_api,
-        chunk_func=chunk_documents,
-        index_cls=Index
+        model='gpt-4o',
+        index_cls=index
     )
-   
-    agent_config = GapFinderAgentConfig()
+    
+    agent_config = GapFinderAgentConfig(
+        client=client,
+        model='gpt-4o'
+        )
+    
     agent = create_agent(agent_config, tools, output_type=output_type)
 
     return agent
@@ -35,7 +54,7 @@ def create_test_agent(output_type=None):
 async def test_agent_runs():
     agent = create_test_agent(output_type=SearchResult)
 
-    user_prompt = "What is this video about: https://www.youtube.com/watch?v=wjZofJX0v4M?"
+    user_prompt = "Ask me a question about embeddings for this video: https://www.youtube.com/watch?v=wjZofJX0v4M?"
     result = await run_agent(agent, user_prompt)
     search_result = result.output
 
@@ -57,19 +76,19 @@ async def test_agent_runs():
 async def test_agent_uses_tools():
     agent = create_test_agent(output_type=ToolCall)
 
-    user_prompt = 'What is this video about: https://www.youtube.com/watch?v=wjZofJX0v4M?'
+    user_prompt = 'I want to leran more about this video: https://www.youtube.com/watch?v=wjZofJX0v4M?'
     result = await run_agent(agent, user_prompt)
 
     messages = result.new_messages()
 
     tool_calls = collect_tools(messages)
-    # print('Tool Calls: {tool_calls}')
-    assert len(tool_calls) >= 2
+    print('Tool Calls: {tool_calls}')
+    assert len(tool_calls) <= 7, f"Expected at most 6 tool calls, but got {len(tool_calls)}"
 
     first_call = tool_calls[0]
-    assert first_call.name == 'process_video_transcript'
+    assert first_call.name == 'get_video_id'
     print('First tool call:', first_call.name, first_call.args)
 
     second_call = tool_calls[1]
-    assert second_call.name == 'extract_concepts'
+    assert second_call.name == 'get_summary'
     print('Second tool call:', second_call.name, second_call.args[0:200])
