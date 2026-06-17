@@ -15,7 +15,7 @@ from gapfinder_agent.yt_agent import (
 )
 
 from gapfinder_agent.tools import GapFinderAgentTools
-from gapfinder_agent.yt_rag_pipeline import YouTubePipeline, VideoMetadataService, TranscriptService, StorageService, ChunkService
+from gapfinder_agent.ingest import YouTubePipeline, VideoMetadataService, TranscriptService, StorageService, ChunkService
 
 
 # ---------------------------------------------------
