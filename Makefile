@@ -11,3 +11,12 @@ tests:
 
 tests-judge:
 	uv run pytest tests/test_judge.py -n 4
+
+run_scenarios:
+	uv run python evals/run_scenarios.py
+
+label_streamlit:
+	uv run streamlit run evals/label_streamlit.py
+
+llm_judge:
+	uv run python evals/llm_judge.py
