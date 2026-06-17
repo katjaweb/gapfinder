@@ -57,6 +57,7 @@ Maps errors → missing concepts
 
 ## System architecture
 
+```
 gapfinder/
 │
 ├── data/                   # output saved from gapfinder_agent/ingest.py
@@ -95,6 +96,7 @@ gapfinder/
 ├── pyproject.toml
 ├── README.md
 └── uv.lock
+```
 
 
 ## Setup
