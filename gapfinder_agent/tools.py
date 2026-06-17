@@ -38,16 +38,40 @@ class GapFinderAgentTools:
             return "Error: Summary not available for this video."
         return summary
 
-    def search_video_transcript(self, search_query: str, filter_dict: dict = None) -> str:
+    
+    def search_video_transcript(self, search_query: str, video_id: str = None) -> str:
         """
         Performs a lexical search over the video's transcript to find specific explanations.
+
+        Args:
+            search_query (str): The search query.
+            video_id (str): Uses video ID to filter results.
+
+        Returns:
+            str: JSON formatted search results.
         """
+
         if self.index_cls is None:
-            return "Error: No video has been processed yet. Please ask the user to provide a YouTube URL first."
-        
-        print(f"Searching transcript for: '{search_query}'")
-        results = self.index_cls.search(search_query, filter_dict=filter_dict, num_results=5)
+            return (
+                "Error: No video has been processed yet. "
+                "Please ask the user to provide a YouTube URL first."
+            )
+
+        filter_dict = {"video_id": video_id} if video_id else None
+
+        print(
+            f"Searching transcript for: '{search_query}' "
+            f"with filter: {filter_dict}"
+        )
+
+        results = self.index_cls.search(
+            search_query,
+            filter_dict=filter_dict,
+            num_results=5
+        )
+
         return json.dumps(results, indent=2)
+
 
     def evaluate_user_answer(self, question: str, user_answer: str, reference_context: str) -> str:
         """
