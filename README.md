@@ -29,14 +29,14 @@ Application questions (transfer knowledge)
 Step 3 — User answers
 User types responses
 
-Step 4 — Gap detection (core innovation)
+Step 4 — Gap detection
 The system compares:
 Expected concepts (from transcript) 
 User answers 
 And identifies:
 Missing concepts 
 Misunderstandings 
-Shallow explanations
+What to revisit
 
 ## Agent structure:
 
@@ -55,15 +55,58 @@ Gap Analyzer Tool
 Maps errors → missing concepts
 
 
+## System architecture
+
+gapfinder/
+│
+├── data/                   # output saved from gapfinder_agent/ingest.py
+│   ├── transcript.json     # will be created with initial run if not exisitng yet
+│   └── yt_chunks.json      # will be created with initial run if not exisitng yet
+│
+├── evals/
+│   ├── evaluation.ipynb
+│   ├── label_streamlit.py  # UI to label  human and llm feedback
+│   ├── llm_judge.py        # llm to judge agent results
+│   ├── run_scenarios.py    # run agent on ground truth dataset for evaluation
+│   ├── results_20260617_164013.json
+│   ├── results_judged_20260617_205710.json
+│   └── scenarios.csv       # test scenarios for evaluation
+│
+├── gapfinder_agent/
+│   ├── app.py              # Streamlit UI to chat with agent
+│   ├── ingest.py           # YouTube → Transcript → Chunks → Index
+│   ├── main.py             # Run agent in temrinal
+│   ├── tools.py            # agents tools
+│   └── yt_agent.py         # agent setup
+│
+├── notebooks/
+│   ├── 01-setup.ipynb
+│   ├── 02-rag.ipynb
+│   └── 03-gapfinder.ipynb
+│
+├── tests/
+│   ├── conftest.py
+│   ├── judge.py
+│   ├── test_agent.py
+│   ├── test_judge.py
+│   └── tutils.py
+│
+├── Makefile
+├── pyproject.toml
+├── README.md
+└── uv.lock
+
+
 ## Setup
 
 1. Install uv if you don't have it yet: https://docs.astral.sh/uv/getting-started/installation/
 
 2. Clone this repository (or download the zip and extract it).
 
-3. Create a `.env` file and add your API keys:
+3. Create a `.env` file and add your OPENAI_API and LOGFIRE_TOKEN key:
 
-       cp .env.example .env
+       OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
+       LOGFIRE_TOKEN="YOUR_LOGFIRE_TOKEN"
 
 4. Install dependencies:
 
@@ -73,15 +116,6 @@ Maps errors → missing concepts
 
        uv run logfire auth
 
-5. Start Jupyter:
-
-       uv run jupyter notebook
 
 ## Notebooks
 
-- `notebooks/01-setup.ipynb` - smoke test that confirms your environment works
-- `notebooks/02-rag.ipynb` - a minimal RAG baseline you can adapt to your own data
-
-## Data
-
-Put your project data in the `data/` folder. See `notebooks/02-rag.ipynb` for how to load it.
