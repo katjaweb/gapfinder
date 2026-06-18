@@ -1,96 +1,108 @@
 # GapFinder
 
-## The Problem
+## Overview
 
-People who learn from long-form videos (e.g., students, self-learners, engineers watching tutorials) often feel like they understand the material but can’t identify what they’ve actually missed. This leads to inefficient rewatching and shallow learning because there’s no clear feedback on gaps in understanding.
+GapFinder is an AI-assisted learning tool for long-form educational videos. It helps learners discover what they truly understood, what concepts they missed, and which parts of the video deserve a second review.
 
-## What It Does
+The assistant uses the video transcript to build knowledge structure, generate tailored comprehension questions, capture learner answers, and identify gaps or misunderstandings. This supports more efficient study and better retention.
 
-The user provides a YouTube video link and answers a small set of generated questions about the content. The system analyzes their responses against the video’s key concepts and returns a structured report highlighting what they understood well, what they misunderstood or missed, and which specific parts of the video they should revisit.
+---
 
-## What the system actually does
+## Problem Statement
 
-Input:
-YouTube video URL 
-User answers to questions 
+Many learners watch long tutorials and lecture videos without a reliable way to check whether they actually understood the content. They may feel confident but still miss key concepts, leading to inefficient rewatching and shallow learning.
 
-## System flow
+GapFinder addresses this problem by turning video transcripts into a diagnostic learning experience: the system asks focused questions, evaluates answers against the underlying content, and highlights the exact concepts that need review.
 
-Step 1 — Extract & structure knowledge
-Transcribe video 
-Break into concepts (chunking + labeling) 
+---
 
-Step 2 — Generate diagnostic questions
-Not generic questions — but:
-Concept coverage questions 
-“Explain in your own words” prompts 
-Application questions (transfer knowledge) 
+## What GapFinder Does
 
-Step 3 — User answers
-User types responses
+1. Fetches a YouTube transcript and metadata.
+2. Breaks the transcript into chunks and labels the main concepts.
+3. Generates a sequence of diagnostic questions, from comprehension to application.
+4. Accepts learner answers and evaluates them against the transcript’s key concepts.
+5. Produces a structured feedback report showing:
+   - Concepts the learner understood well
+   - Concepts they missed
+   - Specific sections of the video worth revisiting
 
-Step 4 — Gap detection
-The system compares:
-Expected concepts (from transcript) 
-User answers 
-And identifies:
-Missing concepts 
-Misunderstandings 
-What to revisit
+---
 
-## Agent structure:
+## System Workflow
 
-Planner Agent
-Decides:
-Which concepts to test
-Which question types to generate
+### 1. Knowledge Extraction
 
-Question Generator Tool
-Creates diagnostic questions
+- Download or access the YouTube transcript
+- Create transcript metadata and store it in `data/`
+- Split the transcript into searchable chunks for retrieval
 
-Evaluation Tool (LLM-as-judge)
-Grades answers against concept checklist
+### 2. Question Generation
 
-Gap Analyzer Tool
-Maps errors → missing concepts
+- Generate concept-specific questions instead of generic prompts.
+- Include:
+  - concept coverage questions
+  - explain-in-your-own-words prompts
+  - transfer/application questions
 
+### 3. Learner Response
 
-## System architecture
+- The learner answers the questions in the chat interface.
+- Answers are captured for evaluation.
+
+### 4. Gap Detection
+
+- Compare expected concepts from the transcript with learner answers
+- Detect missing concepts and misunderstandings
+- Recommend video segments and topics for review
+
+---
+
+## Agent Tools
+
+- `get_video_id` — Extracts the YouTube video ID from a URL and helps select the correct transcript.
+- `get_summary` — Summarizes the main concepts and structure from the transcript.
+- `search_video_transcript` — Performs a lexical search over transcript chunks to retrieve detailed explanations.
+- `evaluate_user_answer` — Grades learner answers using the GapFinder rubric and identifies content gaps.
+
+---
+
+## Architecture
 
 ```
 gapfinder/
 │
-├── data/                   # output saved from gapfinder_agent/ingest.py
-│   ├── transcript.json     # will be created with initial run if not exisitng yet
-│   └── yt_chunks.json      # will be created with initial run if not exisitng yet
+├── data/                   # generated transcript and chunk data
+│   ├── transcript.json     # created by gapfinder_agent/ingest.py
+│   └── yt_chunks.json      # created by gapfinder_agent/ingest.py
 │
-├── evals/
+├── evals/                  # evaluation and labeling tools
 │   ├── evaluation.ipynb
-│   ├── label_streamlit.py  # UI to label  human and llm feedback
-│   ├── llm_judge.py        # llm to judge agent results
-│   ├── run_scenarios.py    # run agent on ground truth dataset for evaluation
-│   ├── results_20260617_164013.json
-│   ├── results_judged_20260617_205710.json
+│   ├── label_streamlit.py  # Streamlit UI for label comparison
+│   ├── llm_judge.py        # judge LLM evaluation pipeline
+│   ├── run_scenarios.py    # run test scenarios and collect output
+│   ├── results_*.json      # scenario output files
+│   ├── results_judged_*.json # judged evaluation output
 │   └── scenarios.csv       # test scenarios for evaluation
 │
-├── gapfinder_agent/
-│   ├── app.py              # Streamlit UI to chat with agent
-│   ├── ingest.py           # YouTube → Transcript → Chunks → Index
-│   ├── main.py             # Run agent in temrinal
-│   ├── tools.py            # agents tools
-│   └── yt_agent.py         # agent setup
+├── gapfinder_agent/        # main application code
+│   ├── app.py              # Streamlit chat UI
+│   ├── ingest.py           # transcript ingestion and indexing
+│   ├── main.py             # terminal agent runner
+│   ├── tools.py            # agent tool implementations
+│   └── yt_agent.py         # agent setup and orchestration
 │
-├── notebooks/
+├── notebooks/              # exploratory notebooks and demos
 │   ├── 01-setup.ipynb
 │   ├── 02-rag.ipynb
 │   └── 03-gapfinder.ipynb
 │
-├── tests/
+├── tests/                  # automated tests
 │   ├── conftest.py
-│   ├── judge.py
-│   ├── test_agent.py
-│   ├── test_judge.py
-│   └── tutils.py
+│   ├── judge.py            # judge configuration
+│   ├── test_agent.py       # agent behavior tests
+│   ├── test_judge.py       # evaluation tests
+│   └── utils.py            # test helpers
 │
 ├── Makefile
 ├── pyproject.toml
@@ -98,26 +110,123 @@ gapfinder/
 └── uv.lock
 ```
 
+---
+
+## Technology Stack
+
+- Python 3.13+
+- `pydantic-ai` for the agent framework
+- `openai` for language model inference
+- `streamlit` for the interactive UI
+- `logfire` for monitoring and observability
+- `minsearch` for retrieval over transcript chunks
+- `pytest` for automated testing
+- `uv` for dependency and runtime management
+
+---
 
 ## Setup
 
-1. Install uv if you don't have it yet: https://docs.astral.sh/uv/getting-started/installation/
+1. Install `uv` if you do not already have it:
+   https://docs.astral.sh/uv/getting-started/installation/
 
-2. Clone this repository (or download the zip and extract it).
+2. Clone the repository.
 
-3. Create a `.env` file and add your OPENAI_API and LOGFIRE_TOKEN key:
+3. Create a `.env` file with your API keys:
 
-       OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
-       LOGFIRE_TOKEN="YOUR_LOGFIRE_TOKEN"
+```env
+OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
+LOGFIRE_TOKEN="YOUR_LOGFIRE_TOKEN"
+```
 
 4. Install dependencies:
 
-       uv sync
+```bash
+uv sync
+```
 
-5. Authenticate to logfire
+5. Authenticate with Logfire:
 
-       uv run logfire auth
+```bash
+uv run logfire auth
+```
 
+---
 
-## Notebooks
+## Usage
+
+### Run the terminal agent
+
+```bash
+make run
+```
+
+This starts the agent in the terminal so you can interact with it by chat.
+
+You can also run a specific video URL directly:
+
+```bash
+v run python -m gapfinder_agent.main "replace_your_url_here"
+```
+
+A good starter prompt is:
+
+```text
+What are the main concepts of this video: "your_video_url"?
+```
+
+When you are finished, enter `stop`.
+
+### Start the Streamlit UI
+
+```bash
+make app
+```
+
+This launches the assistant in your browser through Streamlit.
+
+**How to use**
+
+1. Enter a YouTube URL and click **Analyze Video**.
+2. Wait while the video is processed.
+3. Start chatting with the assistant.
+4. When you think you are finished, ask for evaluation of your answers to questions about the video and get your gap report.
+
+---
+
+## Monitoring
+
+This project includes `logfire` integration for telemetry and dashboarding. Authenticate with `logfire auth` before using monitoring features.
+
+Follow the Logfire project URL shown in your terminal after the app starts. There you can view logs and traces of your interaction with the assistant. Learner feedback is collected with thumbs-up/thumbs-down reactions.
+
+---
+
+## Testing
+
+Run the core test suite:
+
+```bash
+make tests
+```
+
+Run the judge evaluation tests:
+
+```bash
+make tests-judge
+```
+
+---
+
+## Evaluation
+
+The `evals/` folder contains tools for scenario-based evaluation, human labeling, and automated judge evaluation. Use `python evals/run_scenarios.py` to generate scenario outputs and `python evals/llm_judge.py` to run judge assessments.
+
+---
+
+## Notes
+
+- The system is designed to support learners by surfacing concept-level gaps rather than only providing generic quiz feedback.
+- The transcript ingestion pipeline stores results in `data/` and builds a retrieval index for smarter question generation and comparison.
+- The evaluation workflow is intended to align agent output with human feedback through both manual labeling and LLM judging.
 
