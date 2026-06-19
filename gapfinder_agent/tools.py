@@ -31,12 +31,13 @@ class GapFinderAgentTools:
             transcripts = json.load(f)
 
         for entry in transcripts:
-            summary = entry.get(video_id).get("summary")
-            print(summary)
+            video_entry = entry.get(video_id)
+            if video_entry:
+                summary = video_entry.get("summary")
+                if summary:
+                    return summary
             
-        if not summary:
-            return "Error: Summary not available for this video."
-        return summary
+        return "Error: Summary not available for this video."
 
     
     def search_video_transcript(self, search_query: str, video_id: str = None) -> str:
