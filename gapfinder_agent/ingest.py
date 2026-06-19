@@ -117,8 +117,19 @@ class StorageService:
     def append_entry(self, file_path: str, entry: Dict) -> None:
         data = self.load_entries(file_path)
 
-        if any(e.get("video_id") == entry.get("video_id") for e in data):
+        entry_video_id = next(iter(entry), None)
+        if entry_video_id is None:
             return
+
+        for existing in data:
+            if entry_video_id in existing:
+                existing[entry_video_id].update(entry[entry_video_id])
+                self.save_entries(file_path, data)
+                return
+            if existing.get("video_id") == entry_video_id:
+                existing.update(entry)
+                self.save_entries(file_path, data)
+                return
 
         data.append(entry)
         self.save_entries(file_path, data)
@@ -280,10 +291,8 @@ class YouTubePipeline:
         title = meta["title"]
         
         chunks = self.storage.load_chunks()
-
         if any(c.get("video_id") == video_id for c in chunks):
             logger.info(f"Chunks for video_id {video_id} already exist. Skipping chunking.")
-            return chunks
 
         logger.info(f"Processing: {title}")
 
