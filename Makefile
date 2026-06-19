@@ -1,4 +1,7 @@
-.PHONY: tests run streamlit
+.PHONY: ingest app run tests tests-judge test-all run_scenarios label_streamlit llm_judge
+
+ingest:
+	uv run python gapfinder_agent/ingest.py "https://www.youtube.com/watch?v=wjZofJX0v4M"
 
 app:
 	uv run python -m streamlit run gapfinder_agent/app.py
@@ -11,6 +14,9 @@ tests:
 
 tests-judge:
 	uv run pytest tests/test_judge.py -n 4
+
+test-all:
+	uv run pytest
 
 run_scenarios:
 	uv run python evals/run_scenarios.py
