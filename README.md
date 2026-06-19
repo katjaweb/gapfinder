@@ -241,7 +241,7 @@ Recommended workflow:
    uv run streamlit run evals/label_streamlit.py
    ```
 
-![evaluation_labeling](./images/evaluation_labeling.png)
+![human_labeling](./images/human_labeling.png)
 
 What the evaluation checks:
 
