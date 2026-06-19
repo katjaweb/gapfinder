@@ -250,6 +250,8 @@ What the evaluation checks:
 - whether it gives grounded, pedagogically useful feedback
 - whether it stays aligned with the learner answer quality expected by each scenario
 
+The scenario file pairs each prompt with a generated learner answer, an expected quality label, and judging guidance.
+
 The generated artifacts are written back into `evals/` as timestamped `results_*.json` and `results_judged_*.json` files.
 
 ## Notes
