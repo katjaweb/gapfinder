@@ -1,5 +1,7 @@
 # GapFinder
 
+This project was created as the final project for the training program "AI Engineering Buildcamp: From RAG to Agents" by Alexey Grigorev. It demonstrates best practices for AI engineering across agent development, testing, evaluation, and monitoring.
+
 ## Overview
 
 GapFinder is an AI-assisted study tool based on YouTube videos, especially long-form educational videos. It helps learners check what they actually understood, surface the concepts they missed, and pinpoint the parts of a video worth rewatching.
@@ -214,7 +216,6 @@ Notes:
 
 - Most of the agent and judge tests require a valid `OPENAI_API_KEY`.
 - Transcript-driven tests also depend on YouTube transcript access and local ingest data.
-- `tests/test_tool_limits.py` is a useful regression test for tool-call behavior when the agent hits its tool budget.
 
 ## Evaluation
 
@@ -228,19 +229,19 @@ Recommended workflow:
    uv run python evals/run_scenarios.py
    ```
 
-2. Label results in the Streamlit UI for manual inspection:
+2. Use the judge llm to label the latest scenario output:
+
+   ```bash
+   uv run python evals/llm_judge.py
+   ```
+
+3. Label results in the Streamlit UI for manual inspection and add human label:
 
    ```bash
    uv run streamlit run evals/label_streamlit.py
    ```
 
 ![evaluation_labeling](./images/evaluation_labeling.png)
-
-3. Judge the latest scenario output:
-
-   ```bash
-   uv run python evals/llm_judge.py
-   ```
 
 What the evaluation checks:
 
@@ -257,3 +258,4 @@ The generated artifacts are written back into `evals/` as timestamped `results_*
 - The transcript ingestion pipeline stores results in `data/` and builds a retrieval index for smarter question generation and comparison.
 - The evaluation workflow is intended to align agent output with human feedback through both manual labeling and LLM judging.
 - If you are iterating on prompts or tool behavior, a good loop is: run the app, run `make tests`, then generate and judge a fresh `evals/` scenario set.
+- The project includes the section on YouTube transcripts as bonus material.
