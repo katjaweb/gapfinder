@@ -1,3 +1,4 @@
+import argparse
 from pydantic_ai import Agent, RunUsage
 
 from gapfinder_agent.ingest import VideoMetadataService
@@ -30,22 +31,24 @@ pipeline = YouTubePipeline(
 )
 
 
-url = "https://www.youtube.com/watch?v=wjZofJX0v4M"
-result = pipeline.process_video(url)
-logger.info(f"Processed video: {result[0]['title']}")
-index = pipeline.create_rag_index()
-logger.info(f"RAG index created with {len(index.docs)} chunks")
+def build_agent(url: str):
+    result = pipeline.process_video(url, generate_summary=True)
+    logger.info(f"Processed video: {result[0]['title']}")
+    index = pipeline.create_rag_index()
+    logger.info(f"RAG index created with {len(index.docs)} chunks")
 
-config = GapFinderAgentConfig(
-    client=client,
-    model='gpt-4o-mini'
-)
+    config = GapFinderAgentConfig(
+        client=client,
+        model='gpt-4o-mini'
+    )
 
-agent_tools = GapFinderAgentTools(
-    client=OpenAI(),
-    model='gpt-4o-mini',
-    index_cls=index
-)
+    agent_tools = GapFinderAgentTools(
+        client=OpenAI(),
+        model='gpt-4o-mini',
+        index_cls=index
+    )
+
+    return create_agent(config=config, agent_tools=agent_tools)
 
 
 async def run_qna(agent: Agent):
@@ -63,9 +66,7 @@ async def run_qna(agent: Agent):
         usage = usage + result.usage()
         messages.extend(result.new_messages())
 
-async def chat(config=config, agent_tools=agent_tools):
-
-    agent = create_agent(config=config, agent_tools=agent_tools)
+async def chat(agent: Agent):
 
     logger.info("GapFinder Agent is ready!")
     logger.info("Type 'stop' to exit.\n")
@@ -92,8 +93,30 @@ async def chat(config=config, agent_tools=agent_tools):
 
         message_history = result.all_messages()
 
+
+def parse_args():
+    default_url = "https://www.youtube.com/watch?v=wjZofJX0v4M"
+    parser = argparse.ArgumentParser(description="Run GapFinderAgent with a YouTube URL")
+    parser.add_argument(
+        "url",
+        nargs="?",
+        help="YouTube video URL to ingest before starting the agent",
+    )
+    parser.add_argument(
+        "--url",
+        "-u",
+        dest="url",
+        help="YouTube video URL to ingest before starting the agent",
+    )
+    args = parser.parse_args()
+    if args.url is None:
+        args.url = default_url
+    return args
+
+
 if __name__ == "__main__":
     import asyncio
-    asyncio.run(chat())
 
-# uv run python -m gapfinder_agent.main
+    args = parse_args()
+    agent = build_agent(args.url)
+    asyncio.run(chat(agent))
