@@ -2,40 +2,28 @@
 
 ## Overview
 
-GapFinder is an AI-assisted learning tool for long-form educational videos. It helps learners discover what they truly understood, what concepts they missed, and which parts of the video deserve a second review.
+GapFinder is an AI-assisted study tool based on YouTube videos, especially long-form educational videos. It helps learners check what they actually understood, surface the concepts they missed, and pinpoint the parts of a video worth rewatching.
 
-The assistant uses the video transcript to build knowledge structure, generate tailored comprehension questions, capture learner answers, and identify gaps or misunderstandings. This supports more efficient study and better retention.
-
----
-
-## Problem Statement
-
-Many learners watch long tutorials and lecture videos without a reliable way to check whether they actually understood the content. They may feel confident but still miss key concepts, leading to inefficient rewatching and shallow learning.
-
-GapFinder addresses this problem by turning video transcripts into a diagnostic learning experience: the system asks focused questions, evaluates answers against the underlying content, and highlights the exact concepts that need review.
-
----
+The assistant uses a YouTube transcript to build a lightweight retrieval index, generate tailored questions, evaluate learner answers, and return a structured gap report. The goal is to make review more targeted and less guessy.
 
 ## What GapFinder Does
 
 1. Fetches a YouTube transcript and metadata.
-2. Breaks the transcript into chunks and labels the main concepts.
+2. Breaks the transcript into searchable chunks and stores them locally in `data/`.
 3. Generates a sequence of diagnostic questions, from comprehension to application.
 4. Accepts learner answers and evaluates them against the transcript’s key concepts.
 5. Produces a structured feedback report showing:
-   - Concepts the learner understood well
-   - Concepts they missed
-   - Specific sections of the video worth revisiting
-
----
+   - concepts the learner understood well
+   - concepts they missed
+   - specific sections of the video worth revisiting
 
 ## System Workflow
 
 ### 1. Knowledge Extraction
 
-- Download or access the YouTube transcript
-- Create transcript metadata and store it in `data/`
-- Split the transcript into searchable chunks for retrieval
+- Download or access the YouTube transcript.
+- Create transcript metadata and store it in `data/`.
+- Split the transcript into searchable chunks for retrieval.
 
 ### 2. Question Generation
 
@@ -52,40 +40,35 @@ GapFinder addresses this problem by turning video transcripts into a diagnostic 
 
 ### 4. Gap Detection
 
-- Compare expected concepts from the transcript with learner answers
-- Detect missing concepts and misunderstandings
-- Recommend video segments and topics for review
-
----
+- Compare expected concepts from the transcript with learner answers.
+- Detect missing concepts and misunderstandings.
+- Recommend video segments and topics for review.
 
 ## Agent Tools
 
-- `get_video_id` — Extracts the YouTube video ID from a URL and helps select the correct transcript.
-- `get_summary` — Summarizes the main concepts and structure from the transcript.
-- `search_video_transcript` — Performs a lexical search over transcript chunks to retrieve detailed explanations.
-- `evaluate_user_answer` — Grades learner answers using the GapFinder rubric and identifies content gaps.
+- `get_video_id` - Extracts the YouTube video ID from a URL and helps select the correct transcript.
+- `get_summary` - Summarizes the main concepts and structure from the transcript.
+- `search_video_transcript` - Performs a lexical search over transcript chunks to retrieve detailed explanations.
+- `evaluate_user_answer` - Grades learner answers using the GapFinder rubric and identifies content gaps.
 
----
+## Repository Layout
 
-## Architecture
-
-```
+```text
 gapfinder/
-│
 ├── data/                   # generated transcript and chunk data
-│   ├── transcript.json     # created by gapfinder_agent/ingest.py
-│   └── yt_chunks.json      # created by gapfinder_agent/ingest.py
+│   ├── transcripts.json    # transcript metadata and text
+│   └── yt_chunks.json      # chunked transcript data for retrieval
 │
-├── evals/                  # evaluation and labeling tools
-│   ├── evaluation.ipynb
-│   ├── label_streamlit.py  # Streamlit UI for label comparison
-│   ├── llm_judge.py        # judge LLM evaluation pipeline
+├── evals/                  # scenario generation, labeling, and judge runs
+│   ├── evaluation.ipynb    # compare human with judge labels and calculate metrics
+│   ├── label_streamlit.py  # manual labeling UI
+│   ├── llm_judge.py        # scores agent runs with an LLM judge
 │   ├── run_scenarios.py    # run test scenarios and collect output
-│   ├── results_*.json      # scenario output files
-│   ├── results_judged_*.json # judged evaluation output
-│   └── scenarios.csv       # test scenarios for evaluation
+│   ├── results_*.json      # generated evaluation outputs
+│   ├── results_judged_*.json      # judged evaluation output
+│   └── scenarios.csv       # prompts and expected outcomes
 │
-├── gapfinder_agent/        # main application code
+├── gapfinder_agent/        # application code
 │   ├── app.py              # Streamlit chat UI
 │   ├── ingest.py           # transcript ingestion and indexing
 │   ├── main.py             # terminal agent runner
@@ -98,19 +81,14 @@ gapfinder/
 │   └── 03-gapfinder.ipynb
 │
 ├── tests/                  # automated tests
-│   ├── conftest.py
-│   ├── judge.py            # judge configuration
-│   ├── test_agent.py       # agent behavior tests
-│   ├── test_judge.py       # evaluation tests
-│   └── utils.py            # test helpers
+│   ├── test_agent.py       # integration-style agent behavior tests
+│   ├── test_judge.py       # judge criteria tests
+│   └── test_tool_limits.py # tool-limit regression test
 │
 ├── Makefile
 ├── pyproject.toml
-├── README.md
-└── uv.lock
+└── README.md
 ```
-
----
 
 ## Technology Stack
 
@@ -123,12 +101,9 @@ gapfinder/
 - `pytest` for automated testing
 - `uv` for dependency and runtime management
 
----
-
 ## Setup
 
-1. Install `uv` if you do not already have it:
-   https://docs.astral.sh/uv/getting-started/installation/
+1. Install `uv` if you do not already have it: https://docs.astral.sh/uv/getting-started/installation/
 
 2. Clone the repository.
 
@@ -151,8 +126,6 @@ uv sync
 uv run logfire auth
 ```
 
----
-
 ## Usage
 
 ### Run the terminal agent
@@ -166,7 +139,7 @@ This starts the agent in the terminal so you can interact with it by chat.
 You can also run a specific video URL directly:
 
 ```bash
-v run python -m gapfinder_agent.main "replace_your_url_here"
+uv run python -m gapfinder_agent.main "replace_your_url_here"
 ```
 
 A good starter prompt is:
@@ -185,14 +158,14 @@ make app
 
 This launches the assistant in your browser through Streamlit.
 
-**How to use**
+How to use:
 
 1. Enter a YouTube URL and click **Analyze Video**.
 2. Wait while the video is processed.
 3. Start chatting with the assistant.
 4. When you think you are finished, ask for evaluation of your answers to questions about the video and get your gap report.
 
----
+![streamlit_ui](./images/streamlit_ui.png)
 
 ## Monitoring
 
@@ -200,15 +173,28 @@ This project includes `logfire` integration for telemetry and dashboarding. Auth
 
 Follow the Logfire project URL shown in your terminal after the app starts. There you can view logs and traces of your interaction with the assistant. Learner feedback is collected with thumbs-up/thumbs-down reactions.
 
----
+![logfire](./images/logfire.png)
 
 ## Testing
 
-Run the core test suite:
+GapFinder has two main kinds of tests:
+
+- integration-style agent tests that exercise the live tool chain
+- judge tests that check evaluation behavior
+
+The test scenarios are based on the default video in this project. To run them reliably, make sure the ingestion pipeline has been run first so the transcript and chunk data for the default video exist:
+
+```bash
+make ingest
+```
+
+Run the core agent test target:
 
 ```bash
 make tests
 ```
+
+This runs `tests/test_agent.py` with `-s`, so expect verbose output and live calls into the agent stack.
 
 Run the judge evaluation tests:
 
@@ -216,17 +202,56 @@ Run the judge evaluation tests:
 make tests-judge
 ```
 
----
+This runs `tests/test_judge.py` with `pytest-xdist` and is useful for checking the explicit evaluation flow.
+
+Run the full local suite:
+
+```bash
+make test-all
+```
+
+Notes:
+
+- Most of the agent and judge tests require a valid `OPENAI_API_KEY`.
+- Transcript-driven tests also depend on YouTube transcript access and local ingest data.
+- `tests/test_tool_limits.py` is a useful regression test for tool-call behavior when the agent hits its tool budget.
 
 ## Evaluation
 
-The `evals/` folder contains tools for scenario-based evaluation, human labeling, and automated judge evaluation. Use `python evals/run_scenarios.py` to generate scenario outputs and `python evals/llm_judge.py` to run judge assessments.
+The `evals/` folder contains a small evaluation pipeline for scenario-based testing, human review, and automated judging.
 
----
+Recommended workflow:
+
+1. Generate scenario runs:
+
+   ```bash
+   uv run python evals/run_scenarios.py
+   ```
+
+2. Label results in the Streamlit UI for manual inspection:
+
+   ```bash
+   uv run streamlit run evals/label_streamlit.py
+   ```
+
+3. Judge the latest scenario output:
+
+   ```bash
+   uv run python evals/llm_judge.py
+   ```
+
+What the evaluation checks:
+
+- whether the agent chooses the right tools for the situation
+- whether it answers in the right mode, especially when the user explicitly asks for evaluation
+- whether it gives grounded, pedagogically useful feedback
+- whether it stays aligned with the learner answer quality expected by each scenario
+
+The generated artifacts are written back into `evals/` as timestamped `results_*.json` and `results_judged_*.json` files.
 
 ## Notes
 
 - The system is designed to support learners by surfacing concept-level gaps rather than only providing generic quiz feedback.
 - The transcript ingestion pipeline stores results in `data/` and builds a retrieval index for smarter question generation and comparison.
 - The evaluation workflow is intended to align agent output with human feedback through both manual labeling and LLM judging.
-
+- If you are iterating on prompts or tool behavior, a good loop is: run the app, run `make tests`, then generate and judge a fresh `evals/` scenario set.
