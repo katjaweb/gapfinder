@@ -234,6 +234,8 @@ Recommended workflow:
    uv run streamlit run evals/label_streamlit.py
    ```
 
+![evaluation_labeling](./images/evaluation_labeling.png)
+
 3. Judge the latest scenario output:
 
    ```bash
