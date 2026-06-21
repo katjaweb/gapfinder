@@ -172,13 +172,6 @@ make app
 
 This launches the assistant in your browser through Streamlit.
 
-How to use:
-
-1. Use the default URL or enter your own YouTube URL and click **Analyze Video**.
-2. Wait while the video is processed.
-3. Start chatting with the assistant.
-4. When you think you are finished, ask for evaluation of your answers to questions about the video and get your gap report.
-
 ![streamlit_ui](./images/streamlit_ui.png)
 
 ## Monitoring
