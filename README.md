@@ -84,8 +84,7 @@ gapfinder/
 │
 ├── tests/                  # automated tests
 │   ├── test_agent.py       # integration-style agent behavior tests
-│   ├── test_judge.py       # judge criteria tests
-│   └── test_tool_limits.py # tool-limit regression test
+│   └── test_judge.py       # judge criteria tests
 │
 ├── Makefile
 ├── pyproject.toml
