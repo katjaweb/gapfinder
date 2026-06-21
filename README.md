@@ -109,11 +109,18 @@ gapfinder/
 
 2. Clone the repository.
 
+```bash
+git clone https://github.com/katjaweb/gapfinder.git
+cd gapfinder
+```
+
 3. Create a `.env` file with your API keys:
+
+A Logfire account is required for this project. If you do not already have one, create a Logfire account, set up a new project in your Logfire dashboard, and generate a write token for that project. Then add the token to your `.env` file. In its current implementation, you also need an OpenAI API key for language model inference.
 
 ```env
 OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
-LOGFIRE_TOKEN="YOUR_LOGFIRE_TOKEN"
+LOGFIRE_TOKEN="YOUR_LOGFIRE_WRITE_TOKEN"
 ```
 
 4. Install dependencies:
@@ -130,15 +137,21 @@ uv run logfire auth
 
 ## Usage
 
+This project uses the default video `https://www.youtube.com/watch?v=wjZofJX0v4M` so all scripts can be run without choosing your own video tutorial. The default workflow is a good way to verify the system is working.
+
 ### Run the terminal agent
+
+To chat about a video tutorial, the assistant needs to know which video you want to analyze. 
+
+To start the agent with the default URL, run:
 
 ```bash
 make run
 ```
 
-This starts the agent in the terminal so you can interact with it by chat.
+The ingest pipeline runs first. It downloads the transcript, processes it, splits it into chunks for retrieval, creates a summary, stores the chunks and metadata in the `data` folder, and then starts the agent in the terminal so you can chat with it.
 
-You can also run a specific video URL directly:
+You can also run a specific video URL by your choice directly:
 
 ```bash
 uv run python -m gapfinder_agent.main "replace_your_url_here"
@@ -162,7 +175,7 @@ This launches the assistant in your browser through Streamlit.
 
 How to use:
 
-1. Enter a YouTube URL and click **Analyze Video**.
+1. Use the default URL or enter your own YouTube URL and click **Analyze Video**.
 2. Wait while the video is processed.
 3. Start chatting with the assistant.
 4. When you think you are finished, ask for evaluation of your answers to questions about the video and get your gap report.
@@ -198,13 +211,15 @@ make tests
 
 This runs `tests/test_agent.py` with `-s`, so expect verbose output and live calls into the agent stack.
 
+`tests/test_agent.py` is an integration-style test for the YouTube gap-finding agent. One test checks that the agent can answer a prompt about a specific video and returns a populated `SearchResult` with an answer, confidence, and follow-up questions; the other checks that the agent actually invokes the expected tools in the right order, starting with `get_video_id` and then `get_summary`.
+
 Run the judge evaluation tests:
 
 ```bash
 make tests-judge
 ```
 
-This runs `tests/test_judge.py` with `pytest-xdist` and is useful for checking the explicit evaluation flow.
+This runs `tests/test_judge.py` and checks an evaluation-oriented run of the agent against a fixed prompt about a YouTube video. It verifies that the agent makes at least two tool calls, surfaces key concepts from the video, and asks the user whether they want to explore those concepts further.
 
 Run the full local suite:
 
@@ -219,7 +234,9 @@ Notes:
 
 ## Evaluation
 
-The `evals/` folder contains a small evaluation pipeline for scenario-based testing, human review, and automated judging.
+The `evals/` folder contains a small evaluation pipeline for scenario-based testing, human review, and automated judging, also for the default video.
+
+The evaluation scenarios file `evals/scenarios.csv` were generated using an LLM and are based on the default video tutorial.
 
 Recommended workflow:
 
@@ -229,11 +246,15 @@ Recommended workflow:
    uv run python evals/run_scenarios.py
    ```
 
+The script loads evaluation scenarios from evals/scenarios.csv, builds a GapFinder YouTube agent with a retrieval pipeline, and runs each scenario question through that agent. For every execution it collects tool calls, tool context, model usage, cost estimates, and output, then saves all results into a timestamped JSON `results_*.json` file.
+
 2. Use the judge llm to label the latest scenario output:
 
    ```bash
    uv run python evals/llm_judge.py
    ```
+
+`evals/llm_judge.py` loads a JSON results file from `evals/run_scenarios.py`, then uses an LLM-based judge agent to evaluate each agent response against the scenario, expected learner answer quality, and judge criteria. It appends structured judgment fields like label, reasoning, tool-policy compliance, and cost metadata, then writes the augmented results to a new timestamped `results_judged_*.json` file.
 
 3. Label results in the Streamlit UI for manual inspection and add human label:
 
@@ -241,18 +262,19 @@ Recommended workflow:
    uv run streamlit run evals/label_streamlit.py
    ```
 
+`evals/label_streamlit.py` launches a Streamlit web app for browsing `results*.json` evaluation files, viewing each scenario, learner answer, tool evidence, and agent response. It shows existing LLM judge metadata if present, lets a human mark the response as `good`/`bad`, add comments, and saves the updated labels back into the same JSON file.
+
 ![human_labeling](./images/human_labeling.png)
 
-What the evaluation checks:
+Inspecting the evaluation notebook to summarize its workflow accurately.
 
-- whether the agent chooses the right tools for the situation
-- whether it answers in the right mode, especially when the user explicitly asks for evaluation
-- whether it gives grounded, pedagogically useful feedback
-- whether it stays aligned with the learner answer quality expected by each scenario
+Retrieving Notebook summary.
 
-The scenario file pairs each prompt with a generated learner answer, an expected quality label, and judging guidance.
+Found notebook structure; now reading the first cells and markdown to extract purpose.
 
-The generated artifacts are written back into `evals/` as timestamped `results_*.json` and `results_judged_*.json` files.
+Read [](file:///Users/katjaweber/test_yt_agent/gapfinder/evals/evaluation.ipynb)
+
+`evals/evaluation.ipynb` loads a judged results JSON file, then computes evaluation metrics comparing the LLM judge labels with human labels (accuracy, precision, recall). It also prints examples where the labels differ or where the judge marked a response as bad, showing question, human/hypothesis labels, comments, reasoning, and the agent output.
 
 ## Notes
 
@@ -260,4 +282,4 @@ The generated artifacts are written back into `evals/` as timestamped `results_*
 - The transcript ingestion pipeline stores results in `data/` and builds a retrieval index for smarter question generation and comparison.
 - The evaluation workflow is intended to align agent output with human feedback through both manual labeling and LLM judging.
 - If you are iterating on prompts or tool behavior, a good loop is: run the app, run `make tests`, then generate and judge a fresh `evals/` scenario set.
-- The project includes the section on YouTube transcripts as bonus material.
+- The project includes the section on YouTube transcripts as bonus material of the course.
