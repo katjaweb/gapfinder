@@ -265,8 +265,6 @@ The script loads evaluation scenarios from evals/scenarios.csv, builds a GapFind
 
 ![human_labeling](./images/human_labeling.png)
 
-Read [](file:///Users/katjaweber/test_yt_agent/gapfinder/evals/evaluation.ipynb)
-
 `evals/evaluation.ipynb` loads a judged results JSON file, then computes evaluation metrics comparing the LLM judge labels with human labels (accuracy, precision, recall). It also prints examples where the labels differ or where the judge marked a response as bad, showing question, human/hypothesis labels, comments, reasoning, and the agent output.
 
 ## Notes
