@@ -272,5 +272,5 @@ The script loads evaluation scenarios from evals/scenarios.csv, builds a GapFind
 - The system is designed to support learners by surfacing concept-level gaps rather than only providing generic quiz feedback.
 - The transcript ingestion pipeline stores results in `data/` and builds a retrieval index for smarter question generation and comparison.
 - The evaluation workflow is intended to align agent output with human feedback through both manual labeling and LLM judging.
-- If you are iterating on prompts or tool behavior, a good loop is: run the app, run `make tests`, then generate and judge a fresh `evals/` scenario set.
+- If you are iterating on prompts or tool behavior, a good loop is: run the app, run `make tests`, then generate and judge the `evals/` scenario set.
 - The project includes the section on YouTube transcripts as bonus material of the course.
