@@ -196,7 +196,7 @@ GapFinder has two main kinds of tests:
 - integration-style agent tests that exercise the live tool chain
 - judge tests that check evaluation behavior
 
-The test scenarios are based on the default video in this project. To run them reliably, make sure the ingestion pipeline has been run first so the transcript and chunk data for the default video exist:
+To run the tests reliably, make sure the ingestion pipeline has been run first so transcript and chunk data exist. To use the data for the default video, run:
 
 ```bash
 make ingest
