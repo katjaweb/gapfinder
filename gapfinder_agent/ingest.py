@@ -279,7 +279,7 @@ class YouTubePipeline:
         url: str,
         generate_summary: bool = True,
         generate_chunks: bool = True,
-    ) -> dict:
+    ) -> list:
 
         # ----------------------------------------
         # 1. Metadata
@@ -359,7 +359,13 @@ class YouTubePipeline:
 
         logger.info(f"Finished processing: {video_id}")
 
-        return chunks
+        return [
+            {
+                "video_id": video_id,
+                "title": title,
+                **self.entries.get(video_id, {}),
+            }
+        ]
     
 
 if __name__ == "__main__":
