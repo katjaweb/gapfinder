@@ -66,8 +66,8 @@ gapfinder/
 │   ├── label_streamlit.py  # manual labeling UI
 │   ├── llm_judge.py        # scores agent runs with an LLM judge
 │   ├── run_scenarios.py    # run test scenarios and collect output
-│   ├── results_*.json      # generated evaluation outputs
-│   ├── results_judged_*.json      # judged evaluation output
+│   ├── results_*.json      # generated evaluation outputs from run_scenarios.py
+│   ├── results_judged_*.json      # judged evaluation output from llm_judge.py
 │   └── scenarios.csv       # prompts and expected outcomes
 │
 ├── gapfinder_agent/        # application code
