@@ -34,6 +34,14 @@ print("RAG index created with", len(index.docs), "chunks")
 
 
 def create_test_agent(output_type=None):
+    """Build a GapFinder test agent with the configured model and tools.
+
+    Args:
+        output_type: Optional output model to use for the agent run.
+
+    Returns:
+        A configured GapFinder agent instance.
+    """
     tools = GapFinderAgentTools(
         client=client,
         model='gpt-4o',
@@ -52,6 +60,7 @@ def create_test_agent(output_type=None):
 
 @pytest.mark.asyncio
 async def test_agent_runs():
+    """Verify the agent can answer a direct video-related question."""
     agent = create_test_agent(output_type=SearchResult)
 
     user_prompt = "Ask me a question about embeddings for this video: https://www.youtube.com/watch?v=wjZofJX0v4M?"
@@ -74,6 +83,7 @@ async def test_agent_runs():
 
 @pytest.mark.asyncio
 async def test_agent_uses_tools():
+    """Confirm the agent invokes the expected tool sequence for a video query."""
     agent = create_test_agent(output_type=ToolCall)
 
     user_prompt = 'I want to leran more about this video: https://www.youtube.com/watch?v=wjZofJX0v4M?'

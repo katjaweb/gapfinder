@@ -95,6 +95,7 @@ if "agent" not in st.session_state:
 # ---------------------------------------------------
 
 def setup_agent(index):
+    """Initialize the GapFinder agent with a given search index."""
 
     with logfire.span("setup_agent"):
 
@@ -140,6 +141,7 @@ if "chat_messages" not in st.session_state:
 # ---------------------------------------------------
 
 async def ask_agent(user_prompt: str):
+    """Send a user prompt to the agent and return its text response."""
 
     with logfire.attach_context(
         st.session_state.logfire_context
@@ -172,6 +174,7 @@ async def ask_agent(user_prompt: str):
 
 
 def run_coroutine_sync(coro):
+    """Run an async coroutine from synchronous Streamlit code, using a fallback thread loop if needed."""
     try:
         return asyncio.run(coro)
     except RuntimeError:

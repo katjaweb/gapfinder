@@ -38,6 +38,11 @@ class JudgeFeedback(BaseModel):
 
 
 def create_judge_agent():
+    """Construct and return the judge agent used to evaluate model performance.
+
+    The judge agent is configured with the evaluation instructions and
+    the structured `JudgeFeedback` output model.
+    """
     agent = Agent(
         name="judge",
         model="gpt-4o-mini",
@@ -66,6 +71,15 @@ Tool calls:
 
 
 async def assert_criteria(result, criteria):
+    """Run the judge agent on a test result and assert all criteria pass.
+
+    Args:
+        result: The agent execution result containing messages and final output.
+        criteria: A list of criterion descriptions to evaluate.
+
+    Raises:
+        AssertionError: If any criterion is marked as failed by the judge.
+    """
     messages = result.new_messages()
     tool_calls = collect_tools(messages)
 

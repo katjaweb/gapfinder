@@ -103,6 +103,7 @@ def create_agent(
     agent_tools: GapFinderAgentTools,
     output_type=None,
     ) -> Agent:
+    """Create and return a GapFinder Agent configured with tools and instructions."""
 
     tools = [
         Tool(agent_tools.get_video_id, prepare=prepare_tool_with_call_limit),
@@ -127,6 +128,7 @@ def create_agent(
 
 
 def prepare_tool_with_call_limit(ctx, tool_def):
+    """Disable a tool if the current tool-call limit has already been reached."""
     limit = _tool_call_limit.get()
 
     if limit is not None and _tool_call_count.get() >= limit:
@@ -164,6 +166,7 @@ async def run_agent(
         message_history=None,
         tool_calls_limit: int | None = DEFAULT_TOOL_CALL_LIMIT,
     ) -> AgentRunResult:
+    """Execute the agent on a user prompt while enforcing tool-call limits."""
     callback = NamedCallback(agent) 
 
     if message_history is None:
@@ -202,6 +205,7 @@ async def run_without_tools_after_limit(
         callback: NamedCallback,
         error: UsageLimitExceeded,
     ) -> AgentRunResult:
+    """Retry the agent request without tools after a tool-call limit exception."""
     recovery_prompt = f"""
 {user_prompt}
 
@@ -233,6 +237,7 @@ def fallback_result_after_limit(
         message_history: list[Any],
         error: UsageLimitExceeded,
     ) -> AgentRunResult[str]:
+    """Return a fallback AgentRunResult when tool-limit recovery fails."""
     output = f"{TOOL_LIMIT_FALLBACK}\n\nDetails: {error}"
     new_messages = [
         ModelRequest(parts=[UserPromptPart(content=user_prompt)]),

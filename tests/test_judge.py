@@ -27,6 +27,7 @@ index = pipeline.create_rag_index()
 
 @pytest.fixture(scope="module")
 def agent(output_type=None):
+    """Create a shared GapFinder agent fixture for judge tests."""
     tools = GapFinderAgentTools(
         client=client,
         model='gpt-4o',
@@ -45,6 +46,7 @@ def agent(output_type=None):
 
 @pytest.mark.asyncio
 async def test_judge_agent_uses_tools(agent):
+    """Ensure the judge evaluation criteria are met for a video query."""
     user_prompt = 'What is this video about: https://www.youtube.com/watch?v=wjZofJX0v4M?'
     result = await run_agent(agent, user_prompt)
 

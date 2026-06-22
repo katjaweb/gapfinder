@@ -32,6 +32,7 @@ pipeline = YouTubePipeline(
 
 
 def build_agent(url: str):
+    """Build and return a GapFinder agent after ingesting the provided YouTube video."""
     result = pipeline.process_video(url, generate_summary=True)
     logger.info(f"Processed video: {result[0]['title']}")
     index = pipeline.create_rag_index()
@@ -52,6 +53,7 @@ def build_agent(url: str):
 
 
 async def run_qna(agent: Agent):
+    """Run a simple Q&A loop with the given agent until the user types stop."""
     messages = []
     usage = RunUsage()
 
@@ -67,6 +69,7 @@ async def run_qna(agent: Agent):
         messages.extend(result.new_messages())
 
 async def chat(agent: Agent):
+    """Start an interactive agent chat loop in the terminal."""
 
     logger.info("GapFinder Agent is ready!")
     logger.info("Type 'stop' to exit.\n")
@@ -95,6 +98,7 @@ async def chat(agent: Agent):
 
 
 def parse_args():
+    """Parse command-line arguments and return the chosen YouTube URL."""
     default_url = "https://www.youtube.com/watch?v=wjZofJX0v4M"
     parser = argparse.ArgumentParser(description="Run GapFinderAgent with a YouTube URL")
     parser.add_argument(

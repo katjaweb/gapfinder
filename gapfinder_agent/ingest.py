@@ -32,6 +32,7 @@ class VideoMetadataService:
 
     @staticmethod
     def fetch_metadata(video_url: str) -> dict:
+        """Fetch the video's metadata from YouTube using yt-dlp."""
         ydl_opts = {"quiet": True, "skip_download": True}
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -56,6 +57,7 @@ class TranscriptService:
 
 
     def transcript_to_text(self, transcript) -> str:
+        """Convert a transcript object into a plain text string."""
         text = " ".join(
             entry["text"] if isinstance(entry, dict) else entry.text
             for entry in transcript
@@ -101,6 +103,7 @@ class StorageService:
     # ---------- entries ----------
 
     def load_entries(self, file_path: str) -> List[Dict]:
+        """Load JSON entries from a file, returning an empty list if missing or invalid."""
         if not os.path.exists(file_path):
             return []
 
@@ -111,10 +114,12 @@ class StorageService:
             return []
 
     def save_entries(self, file_path: str, data: List[Dict]) -> None:
+        """Save a list of entries to the specified JSON file."""
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
 
     def append_entry(self, file_path: str, entry: Dict) -> None:
+        """Append or merge a transcript entry into the JSON storage file."""
         data = self.load_entries(file_path)
 
         entry_video_id = next(iter(entry), None)
@@ -137,12 +142,15 @@ class StorageService:
     # ---------- chunks ----------
 
     def chunk_file_path(self) -> str:
+        """Return the file path for saved YouTube chunk metadata."""
         return os.path.join(self.base_path, "yt_chunks.json")
 
     def load_chunks(self) -> List[Dict]:
+        """Load saved YouTube chunk entries from the default chunk file."""
         return self.load_entries(self.chunk_file_path())
 
     def save_chunks(self, chunks: List[Dict]) -> None:
+        """Persist YouTube chunk entries to the default chunk file."""
         self.save_entries(self.chunk_file_path(), chunks)
 
 
@@ -153,6 +161,7 @@ class ChunkService:
         self.storage = storage
 
     def store_chunks(self, video_id, title, subtitles, chunk_fn):
+        """Create and save text chunks for a video if they are not already stored."""
         chunks = self.storage.load_chunks()
 
         if any(c.get("video_id") == video_id for c in chunks):
@@ -197,9 +206,7 @@ class YouTubePipeline:
         self.client = openai_client or OpenAI()
         self.entries = {}
 
-    # ----------------------------------------
-    # Helpers
-    # ----------------------------------------
+    # ---------- helpers ----------
 
     @staticmethod
     def format_timestamp(seconds: float) -> str:
@@ -213,9 +220,7 @@ class YouTubePipeline:
 
         return f"{minutes}:{secs:02}"
 
-    # ----------------------------------------
-    # Main Flow
-    # ----------------------------------------
+    # ---------- Main Flow ----------
 
     def extract_concepts(self, transcript_text: str, model: str = "gpt-4o-mini") -> str:
         """
@@ -280,10 +285,9 @@ class YouTubePipeline:
         generate_summary: bool = True,
         generate_chunks: bool = True,
     ) -> list:
+        """Process a YouTube video URL to extract metadata, transcript, and optionally summary and chunks."""
 
-        # ----------------------------------------
-        # 1. Metadata
-        # ----------------------------------------
+    # ---------- 1. Metadata ----------
 
         meta = self.metadata.fetch_metadata(url)
 
@@ -296,9 +300,7 @@ class YouTubePipeline:
 
         logger.info(f"Processing: {title}")
 
-        # ----------------------------------------
-        # 2. Transcript
-        # ----------------------------------------
+    # ---------- 2. Transcript ----------
 
         transcript = self.transcripts.fetch_transcript(video_id)
 
@@ -306,17 +308,14 @@ class YouTubePipeline:
 
         subtitles = self.transcripts.make_subtitles(transcript)
 
-        # ----------------------------------------
-        # 3. Base Entry
-        # ----------------------------------------
+    # ---------- 3. Base Entry ----------
+
         self.entries[video_id] = {
             "title": title,
             "transcript_text": transcript_text,
         }
 
-        # ----------------------------------------
-        # 4. Optional Summary
-        # ----------------------------------------
+    # ---------- 4. Optional Summary ----------
 
         if generate_summary:
             try:
@@ -328,9 +327,7 @@ class YouTubePipeline:
             except Exception as e:
                 logger.error(f"Summary generation failed: {e}")
 
-        # ----------------------------------------
-        # 5. Save Transcript Entry
-        # ----------------------------------------
+        # ---------- 5. Save Transcript Entry ----------
 
         transcripts_path = self.storage.transcript_file_path()
         self.storage.append_entry(
@@ -338,9 +335,7 @@ class YouTubePipeline:
             self.entries
         )
 
-        # ----------------------------------------
-        # 6. Optional Chunking
-        # ----------------------------------------
+        # ---------- 6. Optional Chunking ----------
 
         if (
             generate_chunks
